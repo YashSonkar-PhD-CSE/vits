@@ -44,7 +44,7 @@ def main():
 
   n_gpus = torch.cuda.device_count()
   os.environ['MASTER_ADDR'] = 'localhost'
-  os.environ['MASTER_PORT'] = '80000'
+  os.environ['MASTER_PORT'] = '12345'
 
   hps = utils.get_hparams()
   mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
@@ -201,7 +201,17 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
           epoch,
           100. * batch_idx / len(train_loader)))
         logger.info([x.item() for x in losses] + [global_step, lr])
-        
+        # wandb.log({
+            "loss_g_total": loss_gen_all, 
+            "loss_d_total": loss_disc_all, 
+            "lr": lr, 
+            "grad_norm_d": grad_norm_d, 
+            "grad_norm_g": grad_norm_g,
+            "loss_g_fm": loss_fm,
+            "loss_g_mel": loss_mel,
+            "loss_g_dur": loss_dur,
+            "loss_g_kl": loss_kl,
+        })
         scalar_dict = {"loss/g/total": loss_gen_all, "loss/d/total": loss_disc_all, "learning_rate": lr, "grad_norm_d": grad_norm_d, "grad_norm_g": grad_norm_g}
         scalar_dict.update({"loss/g/fm": loss_fm, "loss/g/mel": loss_mel, "loss/g/dur": loss_dur, "loss/g/kl": loss_kl})
 
