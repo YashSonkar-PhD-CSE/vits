@@ -128,7 +128,11 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   train_loader, eval_loader = loaders
   if writers is not None:
     writer, writer_eval = writers
-
+  wandb.login(key="4abbb21b2d83424beaac33db691b8736ef01b7ed")
+  wandb.init(
+      project = "Speech Experiments",
+      name = "VITS",
+  )
   train_loader.batch_sampler.set_epoch(epoch)
   global global_step
 
@@ -201,7 +205,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
           epoch,
           100. * batch_idx / len(train_loader)))
         logger.info([x.item() for x in losses] + [global_step, lr])
-        # wandb.log({
+        wandb.log({
             "loss_g_total": loss_gen_all, 
             "loss_d_total": loss_disc_all, 
             "lr": lr, 
