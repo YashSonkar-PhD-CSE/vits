@@ -12,7 +12,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import autocast, GradScaler
-
+import wandb
 import commons
 import utils
 from data_utils import (
@@ -44,7 +44,7 @@ def main():
 
   n_gpus = torch.cuda.device_count()
   os.environ['MASTER_ADDR'] = 'localhost'
-  os.environ['MASTER_PORT'] = '80000'
+  os.environ['MASTER_PORT'] = '12345'
 
   hps = utils.get_hparams()
   mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
@@ -130,6 +130,12 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   if writers is not None:
     writer, writer_eval = writers
 
+  wandb.login(key="4abbb21b2d83424beaac33db691b8736ef01b7ed")
+  wandb.init(
+      project = "Speech Experiments",
+      name = "VITS_MS_WT",
+  )
+
   train_loader.batch_sampler.set_epoch(epoch)
   global global_step
 
@@ -203,7 +209,17 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
           epoch,
           100. * batch_idx / len(train_loader)))
         logger.info([x.item() for x in losses] + [global_step, lr])
-        
+        wandb.log({
+            "loss_g_total": loss_gen_all, 
+            "loss_d_total": loss_disc_all, 
+            "lr": lr, 
+            "grad_norm_d": grad_norm_d, 
+            "grad_norm_g": grad_norm_g,
+            "loss_g_fm": loss_fm,
+            "loss_g_mel": loss_mel,
+            "loss_g_dur": loss_dur,
+            "loss_g_kl": loss_kl,
+        })
         scalar_dict = {"loss/g/total": loss_gen_all, "loss/d/total": loss_disc_all, "learning_rate": lr, "grad_norm_d": grad_norm_d, "grad_norm_g": grad_norm_g}
         scalar_dict.update({"loss/g/fm": loss_fm, "loss/g/mel": loss_mel, "loss/g/dur": loss_dur, "loss/g/kl": loss_kl})
 
