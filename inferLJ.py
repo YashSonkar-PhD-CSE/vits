@@ -29,7 +29,7 @@ generatorNet = SynthesizerTrn(
     **hps.model
 ).cuda()
 
-_ = utils.load_checkpoint("./G_141000.pth", generatorNet, None)
+_ = utils.load_checkpoint("./logs/ljs_base/G_141000.pth", generatorNet, None)
 
 with open("transcripts.txt", "r+") as textFile:
     i = 0
