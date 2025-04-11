@@ -37,10 +37,11 @@ from text.symbols import symbols
 torch.backends.cudnn.benchmark = True
 global_step = 0
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def main():
   """Assume Single Node Multi GPUs Training Only"""
-  assert torch.cuda.is_available(), "CPU training is not allowed."
+  # assert torch.cuda.is_available(), "CPU training is not allowed."
 
   n_gpus = torch.cuda.device_count()
   os.environ['MASTER_ADDR'] = 'localhost'
@@ -174,7 +175,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
 
       # Discriminator
       y_d_hat_r, y_d_hat_g, _, _ = net_d(y, y_hat.detach())
-      with autocast(enabled=False):
+      with autocast('cuda', enabled=False):
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
         loss_disc_all = loss_disc
     optim_d.zero_grad()
@@ -186,7 +187,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     with autocast('cuda', enabled=hps.train.fp16_run):
       # Generator
       y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(y, y_hat)
-      with autocast(enabled=False):
+      with autocast('cuda', enabled=False):
         loss_dur = torch.sum(l_length.float())
         loss_mel = F.l1_loss(y_mel, y_hat_mel) * hps.train.c_mel
         loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
@@ -287,14 +288,14 @@ def evaluate(hps, generator, eval_loader, writer_eval):
         hps.data.mel_fmax
       )
     image_dict = {
-      "gen/mel": utils.plot_spectrogram_to_numpy(y_hat_mel[0].cpu().numpy())
+      "gen/mel": utils.plot_spectrogram_to_numpy(y_hat_mel[10].cpu().numpy())
     }
     audio_dict = {
-      "gen/audio": y_hat[0,:,:y_hat_lengths[0]]
+      "gen/audio": y_hat[10,:,:y_hat_lengths[0]]
     }
     if global_step == 0:
-      image_dict.update({"gt/mel": utils.plot_spectrogram_to_numpy(mel[0].cpu().numpy())})
-      audio_dict.update({"gt/audio": y[0,:,:y_lengths[0]]})
+      image_dict.update({"gt/mel": utils.plot_spectrogram_to_numpy(mel[10].cpu().numpy())})
+      audio_dict.update({"gt/audio": y[10,:,:y_lengths[0]]})
 
     utils.summarize(
       writer=writer_eval,
