@@ -12,3 +12,13 @@ monotonic_align/monotonic_align
 wandb/*
 *wtimit*
 *wandb*
+*.zip
+vFiles/*
+*.pth
+*.pt
+*.wav
+*Zone.Identifier
+test.txt.cleaned
+*.json
+*.txt
+*.txt.cleaned

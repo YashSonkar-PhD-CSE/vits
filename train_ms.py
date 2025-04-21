@@ -23,6 +23,7 @@ from data_utils import (
 from models import (
   SynthesizerTrn,
   MultiPeriodDiscriminator,
+  SynthesizerTrnCopy,
 )
 from losses import (
   generator_loss,
@@ -80,7 +81,7 @@ def run(rank, n_gpus, hps):
         batch_size=hps.train.batch_size, pin_memory=True,
         drop_last=False, collate_fn=collate_fn)
 
-  net_g = SynthesizerTrn(
+  net_g = SynthesizerTrnCopy(
       len(symbols),
       hps.data.filter_length // 2 + 1,
       hps.train.segment_size // hps.data.hop_length,
