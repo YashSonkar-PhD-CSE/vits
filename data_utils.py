@@ -9,7 +9,7 @@ import commons
 from mel_processing import spectrogram_torch
 from utils import load_wav_to_torch, load_filepaths_and_text
 from text import text_to_sequence, cleaned_text_to_sequence
-
+import nemo.collections.asr as nemo_asr
 
 class TextAudioLoader(torch.utils.data.Dataset):
     """
@@ -170,6 +170,10 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         self.add_blank = hparams.add_blank
         self.min_text_len = getattr(hparams, "min_text_len", 1)
         self.max_text_len = getattr(hparams, "max_text_len", 190)
+        
+        self.speakerEmbedModel = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
+        self.speakerEmbedModel.eval()
+        self.speakerEmbedModel.freeze()
 
         random.seed(1234)
         random.shuffle(self.audiopaths_sid_text)
@@ -197,13 +201,13 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         audiopath, sid, text = audiopath_sid_text[0], audiopath_sid_text[1], audiopath_sid_text[2]
         text = self.get_text(text)
         spec, wav = self.get_audio(audiopath)
-        sid = self.get_sid(sid)
+        sid = self.get_sid(audiopath)
         return (text, spec, wav, sid)
 
     def get_audio(self, filename):
         audio, sampling_rate = load_wav_to_torch(filename)
         if sampling_rate != self.sampling_rate:
-            raise ValueError("{} {} SR doesn't match target {} SR".format(
+            raise ValueError("{} SR doesn't match target {} SR".format(
                 sampling_rate, self.sampling_rate))
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
@@ -228,9 +232,9 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         text_norm = torch.LongTensor(text_norm)
         return text_norm
 
-    def get_sid(self, sid):
-        sid = torch.LongTensor([int(sid)])
-        return sid
+    def get_sid(self, audiopath: str):
+        sembed = self.speakerEmbedModel.get_embedding(audiopath).transpose(0, 1)
+        return sembed
 
     def __getitem__(self, index):
         return self.get_audio_text_speaker_pair(self.audiopaths_sid_text[index])
@@ -263,11 +267,11 @@ class TextAudioSpeakerCollate():
         text_lengths = torch.LongTensor(len(batch))
         spec_lengths = torch.LongTensor(len(batch))
         wav_lengths = torch.LongTensor(len(batch))
-        sid = torch.LongTensor(len(batch))
 
         text_padded = torch.LongTensor(len(batch), max_text_len)
         spec_padded = torch.FloatTensor(len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
+        sid = torch.FloatTensor(len(batch), 192, 1)
         text_padded.zero_()
         spec_padded.zero_()
         wav_padded.zero_()
@@ -285,8 +289,8 @@ class TextAudioSpeakerCollate():
             wav = row[2]
             wav_padded[i, :, :wav.size(1)] = wav
             wav_lengths[i] = wav.size(1)
-
             sid[i] = row[3]
+            # sid[i] = row[3]
 
         if self.return_ids:
             return text_padded, text_lengths, spec_padded, spec_lengths, wav_padded, wav_lengths, sid, ids_sorted_decreasing
