@@ -25,7 +25,7 @@ import numpy as np
 # Decoder output: (1, 1, N)
 
 lr = 2e-4
-betas = [0.8, 0.99],
+betas = (0.8, 0.99)
 eps = 1e-9
 lrDecay = 0.999875
 numTrainEpochs = 20000
@@ -91,9 +91,9 @@ class Model(torch.nn.Module):
         print(emXLengths)
         emX = emX.transpose(1, 2) # (B, 256, N')
         encX, mQ, logsQ, yMask = self.encoder(emX, emXLengths)
-        zSlice, idsSlice = commons.rand_slice_segments(encX, emXLengths, 8192)
-        decX = self.decoder(zSlice) # (B, 1, N'')
-        return decX, idsSlice
+        # zSlice, idsSlice = commons.rand_slice_segments(encX, emXLengths, 8192)
+        decX = self.decoder(encX) # (B, 1, N'')
+        return decX
     
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(
@@ -126,7 +126,8 @@ class CustomDataset(torch.utils.data.Dataset):
         audio, sr = librosa.load(filePath, sr=self.samplingRate, dtype=np.float32)
         audio = torch.FloatTensor(audio)
         audio = audio / self.maxWavValue
-        sid = self.speakerMap[int(filePath.split("/")[-2][1:])]
+        audio = audio.unsqueeze(0)
+        sid = self.speakerMap[int(filePath.split("/")[-3][1:])]
         sid = torch.LongTensor([sid])
         return audio, sid
 
@@ -137,7 +138,7 @@ class DataCollate():
     
     def __call__(self, batch):
         # Any entry in batch is a tuple of (audio, sid)
-        maxAudioLen = max([len(b[0]) for b in batch])
+        maxAudioLen = max([b[0].size(-1) for b in batch])
         audioLens = torch.LongTensor(len(batch))
         sid = torch.LongTensor(len(batch))
         
@@ -172,12 +173,12 @@ def run():
     schedulerG = torch.optim.lr_scheduler.ExponentialLR(
         optimG,
         gamma = lrDecay,
-        lastEpoch = epochStr - 2
+        last_epoch = epochStr - 2
     )
     schedulerD = torch.optim.lr_scheduler.ExponentialLR(
         optimD,
         gamma = lrDecay,
-        lastEpoch = epochStr - 2
+        last_epoch = epochStr - 2
     )
 
     scaler = torch.amp.GradScaler(device='cuda', enabled=fp16Run)
@@ -233,9 +234,9 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         y, yLenths = y.cuda(non_blocking=True), yLengths.cuda(non_blocking=True)
         speakers = speakers.cuda(non_blocking=True)
         
-        with torch.amp.autocast('cuda', enable = fp16Run):
-            yHat, idsSlice = modelG(y)
-            y = commons.slice_segments(y, idsSlice * 256, 8192) # slice 
+        with torch.amp.autocast('cuda', enabled = fp16Run):
+            yHat = modelG(y)
+            # y = commons.slice_segments(y, idsSlice * 256, 8192) # slice 
             # Discriminator
             yDHatR, yDHatG, _, _ = modelD(y, yHat.detach())
             with torch.amp.autocast('cuda', enabled=False):
@@ -247,7 +248,7 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         gradNormD = commons.clip_grad_value_(modelD.parameters(), None)  
         scaler.step(optimD)
         
-        with torch.amp.autocast('cuda', enable = fp16Run):
+        with torch.amp.autocast('cuda', enabled = fp16Run):
             # Generator
             yHat = modelG(y)
             yDHatR, yDHatG, fMapR, fMapG = modelD(y, yHat)
