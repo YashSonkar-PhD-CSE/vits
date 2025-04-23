@@ -9,7 +9,7 @@ import commons
 from mel_processing import spectrogram_torch
 from utils import load_wav_to_torch, load_filepaths_and_text
 from text import text_to_sequence, cleaned_text_to_sequence
-import nemo.collections.asr as nemo_asr
+# import nemo.collections.asr as nemo_asr
 
 class TextAudioLoader(torch.utils.data.Dataset):
     """
@@ -171,9 +171,9 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         self.min_text_len = getattr(hparams, "min_text_len", 1)
         self.max_text_len = getattr(hparams, "max_text_len", 190)
         
-        self.speakerEmbedModel = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
-        self.speakerEmbedModel.eval()
-        self.speakerEmbedModel.freeze()
+        # self.speakerEmbedModel = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
+        # self.speakerEmbedModel.eval()
+        # self.speakerEmbedModel.freeze()
 
         random.seed(1234)
         random.shuffle(self.audiopaths_sid_text)
@@ -395,3 +395,4 @@ class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
 
     def __len__(self):
         return self.num_samples // self.batch_size
+

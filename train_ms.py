@@ -23,7 +23,7 @@ from data_utils import (
 from models import (
   SynthesizerTrn,
   MultiPeriodDiscriminator,
-  SynthesizerTrnCopy,
+  # SynthesizerTrnCopy,
 )
 from losses import (
   generator_loss,
@@ -38,10 +38,11 @@ from text.symbols import symbols
 torch.backends.cudnn.benchmark = True
 global_step = 0
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def main():
   """Assume Single Node Multi GPUs Training Only"""
-  assert torch.cuda.is_available(), "CPU training is not allowed."
+  # assert torch.cuda.is_available(), "CPU training is not allowed."
 
   n_gpus = torch.cuda.device_count()
   os.environ['MASTER_ADDR'] = 'localhost'
@@ -81,7 +82,7 @@ def run(rank, n_gpus, hps):
         batch_size=hps.train.batch_size, pin_memory=True,
         drop_last=False, collate_fn=collate_fn)
 
-  net_g = SynthesizerTrnCopy(
+  net_g = SynthesizerTrn(
       len(symbols),
       hps.data.filter_length // 2 + 1,
       hps.train.segment_size // hps.data.hop_length,
@@ -134,7 +135,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   wandb.login(key="4abbb21b2d83424beaac33db691b8736ef01b7ed")
   wandb.init(
       project = "Speech Experiments",
-      name = "VITS_MS_WT",
+      name = "VITS_MS_WT_Mod_Sp_Embed",
   )
 
   train_loader.batch_sampler.set_epoch(epoch)
@@ -175,7 +176,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
 
       # Discriminator
       y_d_hat_r, y_d_hat_g, _, _ = net_d(y, y_hat.detach())
-      with autocast(enabled=False):
+      with autocast('cuda', enabled=False):
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
         loss_disc_all = loss_disc
     optim_d.zero_grad()
@@ -187,7 +188,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     with autocast('cuda', enabled=hps.train.fp16_run):
       # Generator
       y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(y, y_hat)
-      with autocast(enabled=False):
+      with autocast('cuda', enabled=False):
         loss_dur = torch.sum(l_length.float())
         loss_mel = F.l1_loss(y_mel, y_hat_mel) * hps.train.c_mel
         loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
