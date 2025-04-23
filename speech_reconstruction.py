@@ -252,12 +252,14 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
             yHat = modelG(y)
             lossDur = torch.floatTensor([0.0]).cuda()
             for pred in range(y.shape[0]):
-                lossDur += (yHat[i].size()[-1] - y.size()[-1]) ** 2
+                lossDur += (yHat[pred].size()[-1] - y[pred].size()[-1]) ** 2
             lossDur /= y.shape[0]
             if y.shape[-1] < yHat.shape[-1]:
-                pass # Pad y to make length equal
+                # Pad y to make lengths equal
+                y = torch.nn.functional.pad(y, (0, yHat.shape[-1] - y.shape[-1]), mode='constant', value=0)
             elif y.shape[-1] > yHat.shape[-1]:
-                pass # Pad yHat to make length equal
+                # Pad yHat to make lengths equal
+                yHat = torch.nn.functional.pad(yHat, (0, y.shape[-1] - yHat.shape[-1]), mode='constant', value=0)
             print(y.shape, yHat.shape)
             yDHatR, yDHatG, fMapR, fMapG = modelD(y, yHat)
             with torch.amp.autocast('cuda', enabled=False):
