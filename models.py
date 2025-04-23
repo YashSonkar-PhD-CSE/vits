@@ -445,8 +445,8 @@ class SynthesizerTrn(nn.Module):
         kernel_size,
         p_dropout)
     self.dec = Generator(inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
-    self.enc_q = PosteriorEncoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=gin_channels)
-    self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels)
+    self.enc_q = PosteriorEncoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=0)
+    self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 4, gin_channels=0)
 
     if use_sdp:
       self.dp = StochasticDurationPredictor(hidden_channels, 192, 3, 0.5, 4, gin_channels=gin_channels)
@@ -467,8 +467,8 @@ class SynthesizerTrn(nn.Module):
     else:
       g = None
 
-    z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
-    z_p = self.flow(z, y_mask, g=g)
+    z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=None)
+    z_p = self.flow(z, y_mask, g=None)
 
     with torch.no_grad():
       # negative cross-entropy
@@ -521,7 +521,7 @@ class SynthesizerTrn(nn.Module):
     logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2) # [b, t', t], [b, t, d] -> [b, d, t']
 
     z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-    z = self.flow(z_p, y_mask, g=g, reverse=True)
+    z = self.flow(z_p, y_mask, g=None, reverse=True)
     o = self.dec((z * y_mask)[:,:,:max_len], g=g)
     return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
@@ -537,7 +537,7 @@ class SynthesizerTrn(nn.Module):
 
 
 
-class SynthesizerTrnCopy(nn.Module):
+class SynthesizerTrnCopy15(nn.Module): # TODO: Comment out this class
   """
   Synthesizer copy that uses speaker embeddings from another model
   """

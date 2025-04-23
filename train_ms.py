@@ -23,7 +23,7 @@ from data_utils import (
 from models import (
   SynthesizerTrn,
   MultiPeriodDiscriminator,
-  SynthesizerTrnCopy,
+  # SynthesizerTrnCopy,
 )
 from losses import (
   generator_loss,
@@ -82,7 +82,7 @@ def run(rank, n_gpus, hps):
         batch_size=hps.train.batch_size, pin_memory=True,
         drop_last=False, collate_fn=collate_fn)
 
-  net_g = SynthesizerTrnCopy(
+  net_g = SynthesizerTrn(
       len(symbols),
       hps.data.filter_length // 2 + 1,
       hps.train.segment_size // hps.data.hop_length,
@@ -135,7 +135,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   wandb.login(key="4abbb21b2d83424beaac33db691b8736ef01b7ed")
   wandb.init(
       project = "Speech Experiments",
-      name = "VITS_MS_WT",
+      name = "VITS_MS_WT_Mod_Sp_Embed",
   )
 
   train_loader.batch_sampler.set_epoch(epoch)
@@ -289,14 +289,14 @@ def evaluate(hps, generator, eval_loader, writer_eval):
         hps.data.mel_fmax
       )
     image_dict = {
-      "gen/mel": utils.plot_spectrogram_to_numpy(y_hat_mel[10].cpu().numpy())
+      "gen/mel": utils.plot_spectrogram_to_numpy(y_hat_mel[0].cpu().numpy())
     }
     audio_dict = {
-      "gen/audio": y_hat[10,:,:y_hat_lengths[0]]
+      "gen/audio": y_hat[0,:,:y_hat_lengths[0]]
     }
     if global_step == 0:
-      image_dict.update({"gt/mel": utils.plot_spectrogram_to_numpy(mel[10].cpu().numpy())})
-      audio_dict.update({"gt/audio": y[10,:,:y_lengths[0]]})
+      image_dict.update({"gt/mel": utils.plot_spectrogram_to_numpy(mel[0].cpu().numpy())})
+      audio_dict.update({"gt/audio": y[0,:,:y_lengths[0]]})
 
     utils.summarize(
       writer=writer_eval,
