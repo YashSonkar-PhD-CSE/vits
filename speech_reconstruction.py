@@ -250,7 +250,7 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         with torch.amp.autocast('cuda', enabled = fp16Run):
             # Generator
             yHat = modelG(y)
-            lossDur = torch.floatTensor([0.0]).cuda()
+            lossDur = torch.FloatTensor([0.0]).cuda()
             for pred in range(y.shape[0]):
                 lossDur += (yHat[pred].size()[-1] - y[pred].size()[-1]) ** 2
             lossDur /= y.shape[0]
@@ -260,7 +260,6 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
             elif y.shape[-1] > yHat.shape[-1]:
                 # Pad yHat to make lengths equal
                 yHat = torch.nn.functional.pad(yHat, (0, y.shape[-1] - yHat.shape[-1]), mode='constant', value=0)
-            print(y.shape, yHat.shape)
             yDHatR, yDHatG, fMapR, fMapG = modelD(y, yHat)
             with torch.amp.autocast('cuda', enabled=False):
                 lossGen, lossesGen = generator_loss(yDHatG)
@@ -311,8 +310,8 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
                 scalars=scalarDict
             )
         
-        if globalStep % evalInterval == 0:
-            evaluate(modelG, valLoader, valWriter)
+        if globalStep % evalInterval == 0 and globalStep != 0:
+            # evaluate(modelG, valLoader, valWriter)
             utils.save_checkpoint(modelG, optimD, lr, epoch, os.path.join(logDir, "G_{}.pth".format(globalStep)))   
             utils.save_checkpoint(modelD, optimD, lr, epoch, os.path.join(logDir, "D_{}.pth".format(globalStep)))   
         globalStep += 1
