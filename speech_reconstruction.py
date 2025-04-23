@@ -88,7 +88,6 @@ class Model(torch.nn.Module):
         hX = self.hubert.units(x).clone() # (B, N', 256)
         emX = self.embedder(hX) # (B, N', 256)
         emXLengths = torch.tensor([emXi.size(-1) for emXi in emX]).cuda() # (B)
-        print(emXLengths)
         emX = emX.transpose(1, 2) # (B, 256, N')
         encX, mQ, logsQ, yMask = self.encoder(emX, emXLengths)
         # zSlice, idsSlice = commons.rand_slice_segments(encX, emXLengths, 8192)
@@ -251,11 +250,20 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         with torch.amp.autocast('cuda', enabled = fp16Run):
             # Generator
             yHat = modelG(y)
+            lossDur = torch.floatTensor([0.0]).cuda()
+            for pred in range(y.shape[0]):
+                lossDur += (yHat[i].size()[-1] - y.size()[-1]) ** 2
+            lossDur /= y.shape[0]
+            if y.shape[-1] < yHat.shape[-1]:
+                pass # Pad y to make length equal
+            elif y.shape[-1] > yHat.shape[-1]:
+                pass # Pad yHat to make length equal
+            print(y.shape, yHat.shape)
             yDHatR, yDHatG, fMapR, fMapG = modelD(y, yHat)
             with torch.amp.autocast('cuda', enabled=False):
                 lossGen, lossesGen = generator_loss(yDHatG)
                 lossFM = feature_loss(fMapR, fMapG)
-                lossGenAll = lossGen + lossFM
+                lossGenAll = lossGen + lossFM + lossDur
 
         optimG.zero_grad()
         scaler.scale(lossGenAll).backward()
