@@ -201,7 +201,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         audiopath, sid, text = audiopath_sid_text[0], audiopath_sid_text[1], audiopath_sid_text[2]
         text = self.get_text(text)
         spec, wav = self.get_audio(audiopath)
-        sid = self.get_sid(audiopath)
+        sid = self.get_sid(sid)
         return (text, spec, wav, sid)
 
     def get_audio(self, filename):
@@ -232,9 +232,9 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         text_norm = torch.LongTensor(text_norm)
         return text_norm
 
-    def get_sid(self, audiopath: str):
-        sembed = self.speakerEmbedModel.get_embedding(audiopath).transpose(0, 1)
-        return sembed
+    def get_sid(self, sid):
+        sid = torch.LongTensor([int(sid)])
+        return sid
 
     def __getitem__(self, index):
         return self.get_audio_text_speaker_pair(self.audiopaths_sid_text[index])
@@ -267,11 +267,12 @@ class TextAudioSpeakerCollate():
         text_lengths = torch.LongTensor(len(batch))
         spec_lengths = torch.LongTensor(len(batch))
         wav_lengths = torch.LongTensor(len(batch))
+        sid = torch.LongTensor(len(batch))
 
         text_padded = torch.LongTensor(len(batch), max_text_len)
         spec_padded = torch.FloatTensor(len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
-        sid = torch.FloatTensor(len(batch), 192, 1)
+        # sid = torch.FloatTensor(len(batch), 192, 1)
         text_padded.zero_()
         spec_padded.zero_()
         wav_padded.zero_()
