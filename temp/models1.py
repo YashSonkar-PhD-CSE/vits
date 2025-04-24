@@ -12,7 +12,7 @@ import monotonic_align
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from commons import init_weights, get_padding
-import nemo.collections.asr as nemo_asr
+
 
 class StochasticDurationPredictor(nn.Module):
   def __init__(self, in_channels, filter_channels, kernel_size, p_dropout, n_flows=4, gin_channels=0):
@@ -455,8 +455,6 @@ class SynthesizerTrn(nn.Module):
 
     if n_speakers > 1:
       self.emb_g = nn.Embedding(n_speakers, gin_channels)
-      # self.emb_g = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
-      # self.emb_g.eval()
 
   def forward(self, x, x_lengths, y, y_lengths, sid=None):
 
@@ -526,11 +524,10 @@ class SynthesizerTrn(nn.Module):
 
   def voice_conversion(self, y, y_lengths, sid_src, sid_tgt):
     assert self.n_speakers > 0, "n_speakers have to be larger than 0."
-    # g_src = self.emb_g(sid_src).unsqueeze(-1)
     g_src = self.emb_g(sid_src).unsqueeze(-1)
     g_tgt = self.emb_g(sid_tgt).unsqueeze(-1)
     z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
     z_p = self.flow(z, y_mask, g=g_src)
     z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
-    o_hat = self.dec(z * y_mask, g=g_tgt)
-    return o_hat, y_mask, (z, z, z)
+    o_hat = self.dec(z_hat * y_mask, g=g_tgt)
+    return o_hat, y_mask, (z, z_p, z_hat)
