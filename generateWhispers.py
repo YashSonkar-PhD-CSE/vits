@@ -2,7 +2,7 @@ import os
 import torch
 import torchaudio
 
-from temp.models1 import SynthesizerTrn
+from models import SynthesizerTrn
 from text import symbols
 import utils
 import commons 
@@ -20,7 +20,7 @@ def get_text(text, hps):
 
 speakers = [2 * i for i in range(38)]
 
-hps = utils.get_hparams_from_file("./configs/wtimit_base.json")
+hps = utils.get_hparams_from_file("./configs/wtimit_192.json")
 
 
 net_g = SynthesizerTrn(
@@ -31,7 +31,7 @@ net_g = SynthesizerTrn(
     **hps.model).cuda()
 _ = net_g.eval()
 
-_ = utils.load_checkpoint("G_172000.pth", net_g, None)
+_ = utils.load_checkpoint("vits_mod_decoder.pth", net_g, None)
 
 def generateWhisperForSpeaker(text: torch.Tensor, textLengths: torch.LongTensor, sid: int):
     """
