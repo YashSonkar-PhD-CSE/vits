@@ -42,6 +42,7 @@ hubert = torch.hub.load(
     f"hubert_soft",
     trust_repo=True,
 ).cuda()
+print("Loaded HuBERT")
 enc = PosteriorEncoder(
     in_channels=256,
     out_channels=32,
@@ -72,6 +73,7 @@ class Model(torch.nn.Module):
         hubert: torch.nn.Module,
         encoder: torch.nn.Module,
         decoder: torch.nn.Module,
+        numSpeakers: int = 1,
     ):
         super(Model, self).__init__()
         self.hubert = hubert.eval() # (1, N', 256)
@@ -83,15 +85,20 @@ class Model(torch.nn.Module):
         self.encoder = encoder # (1, N', 256)
         
         self.decoder = decoder # (1, 1, N'')
+        self.spEmbedder = torch.nn.Embedding(
+            numSpeakers,
+            192,
+        )
     
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, sid: torch.LongTensor = None):
         hX = self.hubert.units(x).clone() # (B, N', 256)
         emX = self.embedder(hX) # (B, N', 256)
         emXLengths = torch.tensor([emXi.size(-1) for emXi in emX]).cuda() # (B)
         emX = emX.transpose(1, 2) # (B, 256, N')
         encX, mQ, logsQ, yMask = self.encoder(emX, emXLengths)
+        spEmbed = self.spEmbedder(sid).unsqueeze(-1)
         # zSlice, idsSlice = commons.rand_slice_segments(encX, emXLengths, 8192)
-        decX = self.decoder(encX) # (B, 1, N'')
+        decX = self.decoder(encX, g = spEmbed) # (B, 1, N'')
         return decX
     
 class CustomDataset(torch.utils.data.Dataset):
@@ -319,6 +326,10 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         
     def evaluate(model, loader, writer):
         pass
+    
+def get_model():
+    model = Model(hubert, enc, dec)
+    return model
     
 if __name__ == "__main__":
     run()
