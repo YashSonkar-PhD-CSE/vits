@@ -241,7 +241,7 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         speakers = speakers.cuda(non_blocking=True)
         
         with torch.amp.autocast('cuda', enabled = fp16Run):
-            yHat = modelG(y)
+            yHat = modelG(y, speakers)
             # y = commons.slice_segments(y, idsSlice * 256, 8192) # slice 
             # Discriminator
             yDHatR, yDHatG, _, _ = modelD(y, yHat.detach())
@@ -256,7 +256,7 @@ def train(epoch, models, optims, schedulers, scaler, loaders, logger, writers):
         
         with torch.amp.autocast('cuda', enabled = fp16Run):
             # Generator
-            yHat = modelG(y)
+            yHat = modelG(y, speakers)
             lossDur = torch.FloatTensor([0.0]).cuda()
             for pred in range(y.shape[0]):
                 lossDur += (yHat[pred].size()[-1] - y[pred].size()[-1]) ** 2
