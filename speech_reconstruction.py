@@ -73,7 +73,7 @@ class Model(torch.nn.Module):
         hubert: torch.nn.Module,
         encoder: torch.nn.Module,
         decoder: torch.nn.Module,
-        numSpeakers: int = 1,
+        numSpeakers: int = 48,
     ):
         super(Model, self).__init__()
         self.hubert = hubert.eval() # (1, N', 256)
@@ -102,6 +102,7 @@ class Model(torch.nn.Module):
         return decX
     
     def infer(self, x: torch.Tensor, sid: torch.Tensor):
+        print(sid)
         with torch.no_grad():
             hX = self.hubert.units(x).clone() # (B, N', 256)
             emX = self.embedder(hX) # (B, N', 256)
@@ -117,26 +118,25 @@ class CustomDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         split: str = 'train',
-        dataPath: str = '/ssd_scratch/cvit/yash/wTIMIT/converted_wavs/'
+        dataPath: str = '/home/yash7/vF/'
     ):
         self.split = split
         self.dataPath = dataPath
         self.filelist = []
         self.speakerMap = {0: 0, 2: 1, 4: 2, 6: 3, 8: 4, 10: 5, 12: 6, 14: 7, 16: 8, 18: 9, 101: 10, 103: 11, 105: 12, 107: 13, 109: 14, 111: 15, 116: 16, 118: 17, 120: 18, 122: 19, 124: 20, 126: 21, 128: 22, 130: 23, 1: 24, 3: 25, 5: 26, 7: 27, 9: 28, 11: 29, 13: 30, 15: 31, 17: 32, 19: 33, 102: 34, 104: 35, 106: 36, 108: 37, 110: 38, 112: 39, 117: 40, 119: 41, 121: 42, 123: 43, 125: 44, 127: 45, 129: 46, 131: 47}
-        for speaker in os.listdir(os.path.join(dataPath, "normal")):
-            if split == 'val' and int(speaker[1:]) < 121:
-                continue
-            
-            for file in os.listdir(os.path.join(dataPath, "normal", speaker, "wavs")):
+        for speaker in os.listdir(os.path.join(dataPath, "valFiles")):
+            # if split == 'val' and int(speaker[1:]) < 121:
+            #     continue
+            for file in os.listdir(os.path.join(dataPath, "valFiles", speaker)):
                 if file.endswith(".wav"):
-                    self.filelist.append(os.path.join(dataPath, "normal", speaker, "wavs", file))
-        for speaker in os.listdir(os.path.join(dataPath, "whisper")):
-            if split == 'val' and int(speaker[1:]) < 121:
-                continue
+                    self.filelist.append(os.path.join(dataPath, "valFiles", speaker, file))
+        # for speaker in os.listdir(os.path.join(dataPath, "whisper")):
+        #     if split == 'val' and int(speaker[1:]) < 121:
+        #         continue
             
-            for file in os.listdir(os.path.join(dataPath, "whisper", speaker, "wavs")):
-                if file.endswith(".wav"):
-                    self.filelist.append(os.path.join(dataPath, "whisper", speaker, "wavs", file))
+        #     for file in os.listdir(os.path.join(dataPath, "whisper", speaker, "wavs")):
+        #         if file.endswith(".wav"):
+        #             self.filelist.append(os.path.join(dataPath, "whisper", speaker, "wavs", file))
         self.maxWavValue = 1.33
         self.samplingRate = 16000
         self.filterLengths = 1024
@@ -152,7 +152,7 @@ class CustomDataset(torch.utils.data.Dataset):
         audio = torch.FloatTensor(audio)
         audio = audio / self.maxWavValue
         audio = audio.unsqueeze(0)
-        sid: int = self.speakerMap[int(filePath.split("/")[-3][1:])]
+        sid: int = self.speakerMap[int(filePath.split("/")[-2][1:])]
         sid = 2 * sid + (1 if ("whisper" in filePath) else 0)
         sid = torch.LongTensor([sid])
         return audio, sid
