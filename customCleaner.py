@@ -58,4 +58,3 @@ if __name__ == "__main__":
     with open(cleanedFileList + "1", "w") as writeFile:
         for line in cleanLines:
             writeFile.write(line)
-        

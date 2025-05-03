@@ -445,13 +445,13 @@ class SynthesizerTrn(nn.Module):
         kernel_size,
         p_dropout)
     self.dec = Generator(inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
-    self.enc_q = PosteriorEncoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=0)
-    self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 4, gin_channels=0)
+    self.enc_q = PosteriorEncoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=gin_channels)
+    self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels)
 
     if use_sdp:
-      self.dp = StochasticDurationPredictor(hidden_channels, 192, 3, 0.5, 4, gin_channels=0)
+      self.dp = StochasticDurationPredictor(hidden_channels, 192, 3, 0.5, 4, gin_channels=gin_channels)
     else:
-      self.dp = DurationPredictor(hidden_channels, 256, 3, 0.5, gin_channels=0)
+      self.dp = DurationPredictor(hidden_channels, 256, 3, 0.5, gin_channels=gin_channels)
 
     if n_speakers > 1:
       self.emb_g = nn.Embedding(n_speakers, gin_channels)
@@ -462,13 +462,12 @@ class SynthesizerTrn(nn.Module):
 
     x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
     if self.n_speakers > 0:
-      # TODO: Look for a proper implementation when using TitaNet
       g = self.emb_g(sid).unsqueeze(-1) # [b, h, 1]
     else:
       g = None
 
-    z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=None)
-    z_p = self.flow(z, y_mask, g=None)
+    z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
+    z_p = self.flow(z, y_mask, g=g)
 
     with torch.no_grad():
       # negative cross-entropy
@@ -484,11 +483,11 @@ class SynthesizerTrn(nn.Module):
 
     w = attn.sum(2)
     if self.use_sdp:
-      l_length = self.dp(x, x_mask, w, g=None)
+      l_length = self.dp(x, x_mask, w, g=g)
       l_length = l_length / torch.sum(x_mask)
     else:
       logw_ = torch.log(w + 1e-6) * x_mask
-      logw = self.dp(x, x_mask, g=None)
+      logw = self.dp(x, x_mask, g=g)
       l_length = torch.sum((logw - logw_)**2, [1,2]) / torch.sum(x_mask) # for averaging 
 
     # expand prior
@@ -496,7 +495,6 @@ class SynthesizerTrn(nn.Module):
     logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
     z_slice, ids_slice = commons.rand_slice_segments(z, y_lengths, self.segment_size)
-    print(z_slice.shape, z.shape)
     o = self.dec(z_slice, g=g)
     return o, l_length, attn, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
@@ -508,9 +506,9 @@ class SynthesizerTrn(nn.Module):
       g = None
 
     if self.use_sdp:
-      logw = self.dp(x, x_mask, g=None, reverse=True, noise_scale=noise_scale_w)
+      logw = self.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
     else:
-      logw = self.dp(x, x_mask, g=None)
+      logw = self.dp(x, x_mask, g=g)
     w = torch.exp(logw) * x_mask * length_scale
     w_ceil = torch.ceil(w)
     y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
@@ -522,22 +520,17 @@ class SynthesizerTrn(nn.Module):
     logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2) # [b, t', t], [b, t, d] -> [b, d, t']
 
     z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-    z = self.flow(z_p, y_mask, g=None, reverse=True)
-    print(z.shape)
+    z = self.flow(z_p, y_mask, g=g, reverse=True)
     o = self.dec((z * y_mask)[:,:,:max_len], g=g)
     return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
   def voice_conversion(self, y, y_lengths, sid_src, sid_tgt):
     assert self.n_speakers > 0, "n_speakers have to be larger than 0."
+    # g_src = self.emb_g(sid_src).unsqueeze(-1)
     g_src = self.emb_g(sid_src).unsqueeze(-1)
     g_tgt = self.emb_g(sid_tgt).unsqueeze(-1)
-    print("PostEnc Inp: ", y.shape, y_lengths)
-    z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=None)
-    # z_p = self.flow(z, y_mask, g=None)
-    # z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
+    z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
+    z_p = self.flow(z, y_mask, g=g_src)
+    z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
     o_hat = self.dec(z * y_mask, g=g_tgt)
-    print(z.shape, o_hat.shape)
     return o_hat, y_mask, (z, z, z)
-
-# TODO: Modify speech reconstruction pipeline:
-# Input voice -> HuBERT units -> Embedding Layer -> Posterior Encoder -> Decoder -> Output Waveform
