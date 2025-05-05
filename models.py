@@ -538,6 +538,3 @@ class SynthesizerTrn(nn.Module):
     o_hat = self.dec(z * y_mask, g=g_tgt)
     print(z.shape, o_hat.shape)
     return o_hat, y_mask, (z, z, z)
-
-# TODO: Modify speech reconstruction pipeline:
-# Input voice -> HuBERT units -> Embedding Layer -> Posterior Encoder -> Decoder -> Output Waveform
