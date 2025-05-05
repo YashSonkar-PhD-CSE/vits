@@ -1,3 +1,41 @@
+# import text
+
+# if __name__ == "__main__":
+#     filelist = "wtimit_normal_list1.txt"
+#     textIndex = 2 # Index of transcript in filelist.txt
+#     print("Starting")
+#     lines = []
+#     cleanedLines = []
+#     print("Reading")
+#     with open(filelist) as f:
+#         index = 0
+#         line = f.readline()
+#         while line:
+#             print("Progress: ", index, end="\r")
+#             index += 1
+#             line = line.strip()
+#             lines.append(line)
+#             line = f.readline()
+#     print("Cleaning" + " " * 30)
+#     index = 0
+#     for i, line in enumerate(lines):
+#         print("Progress: ", index, end="\r")
+#         index += 1
+#         if i <= 4096:
+#             continue
+#         parts = line.strip().split("|")
+#         cleaned_text = text._clean_text(parts[textIndex], ["english_cleaners2"])
+#         cleanedLines.append(cleaned_text)
+#         if i % 4096 == 0 and i != 0:
+#             print(f"Writing current progress {i // 4096}", end="\r")
+#             with open(filelist + f"_{i // 4096}_" + ".cleaned", "w") as writeFile:
+#                 for cline in cleanedLines:
+#                     # Hard-coded for textIndex = 2
+#                     writeFile.write(f"{parts[0]}|{parts[1]}|{cline}\n")
+#             cleanedLines.clear()
+#             print(len(cleanedLines), " " * 40)
+#     print("Finished")
+
 import text
 import os
 if __name__ == "__main__":

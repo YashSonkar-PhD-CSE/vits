@@ -22,3 +22,4 @@ test.txt.cleaned
 *.json
 *.txt
 *.txt.cleaned
+filelistCreator.py
