@@ -12,7 +12,7 @@ import monotonic_align
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from commons import init_weights, get_padding
-# import nemo.collections.asr as nemo_asr
+import nemo.collections.asr as nemo_asr
 
 class StochasticDurationPredictor(nn.Module):
   def __init__(self, in_channels, filter_channels, kernel_size, p_dropout, n_flows=4, gin_channels=0):
@@ -454,13 +454,18 @@ class SynthesizerTrn(nn.Module):
       self.dp = DurationPredictor(hidden_channels, 256, 3, 0.5, gin_channels=gin_channels)
 
     if n_speakers > 1:
-      self.emb_g = nn.Embedding(n_speakers, gin_channels)
+      # self.emb_g = nn.Embedding(n_speakers, gin_channels)
+      self.emb_g = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
+      self.mlp = nn.Linear(192, gin_channels)
+      self.emb_g.eval()
 
   def forward(self, x, x_lengths, y, y_lengths, sid=None):
 
     x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
     if self.n_speakers > 0:
-      g = self.emb_g(sid).unsqueeze(-1) # [b, h, 1]
+      g = self.emb_g(sid)
+      g = self.mlp(g).unsqueeze(-1)# [b, h, 1]
+
     else:
       g = None
 
@@ -493,6 +498,7 @@ class SynthesizerTrn(nn.Module):
     logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
     z_slice, ids_slice = commons.rand_slice_segments(z, y_lengths, self.segment_size)
+    print(z_slice.shape, z.shape)
     o = self.dec(z_slice, g=g)
     return o, l_length, attn, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
@@ -504,9 +510,9 @@ class SynthesizerTrn(nn.Module):
       g = None
 
     if self.use_sdp:
-      logw = self.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
+      logw = self.dp(x, x_mask, g=None, reverse=True, noise_scale=noise_scale_w)
     else:
-      logw = self.dp(x, x_mask, g=g)
+      logw = self.dp(x, x_mask, g=None)
     w = torch.exp(logw) * x_mask * length_scale
     w_ceil = torch.ceil(w)
     y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
@@ -518,7 +524,8 @@ class SynthesizerTrn(nn.Module):
     logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2) # [b, t', t], [b, t, d] -> [b, d, t']
 
     z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-    z = self.flow(z_p, y_mask, g=g, reverse=True)
+    z = self.flow(z_p, y_mask, g=None, reverse=True)
+    print(z.shape)
     o = self.dec((z * y_mask)[:,:,:max_len], g=g)
     return o, attn, y_mask, (z, z_p, m_p, logs_p)
 

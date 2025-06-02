@@ -17,8 +17,8 @@
     "c_kl": 1.0
   },
   "data": {
-    "training_files":"filelists/wtimit_train2_1.txt.cleaned",
-    "validation_files":"filelists/wtimit_val.txt.cleaned",
+    "training_files":"filelists/wt_custom1_train.txt.cleaned",
+    "validation_files":"filelists/wt_custom1_val.txt.cleaned",
     "text_cleaners":["english_cleaners2"],
     "max_wav_value": 1.33,
     "sampling_rate": 24000,

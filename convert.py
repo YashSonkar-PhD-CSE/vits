@@ -2,10 +2,10 @@ import warnings
 from numba.core.errors import NumbaWarning
 
 warnings.simplefilter('ignore', category=NumbaWarning)
-
+# import IPython.display as ipd
 import torch
 from torch.utils.data import DataLoader
-
+import os
 import commons
 import utils
 from data_utils import TextAudioSpeakerLoader, TextAudioSpeakerCollate
@@ -26,7 +26,13 @@ net_g = SynthesizerTrn(
     **hps.model).cuda()
 _ = net_g.eval()
 
-_ = utils.load_checkpoint("/ssd_scratch/cvit/yash/vits/logs/wt_custom/G_78000.pth", net_g, None)
+ckptFile = os.listdir("/ssd_scratch/cvit/yash/vits/logs/wt_custom")
+ckptFile = [s for s in ckptFile if s.startswith("G_") and s.endswith(".pth")]
+ckptFile = sorted(ckptFile)
+print("Using checkpoint", ckptFile)
+_ = utils.load_checkpoint(f"/ssd_scratch/cvit/yash/vits/logs/wt_custom/{ckptFile[-1]}", net_g, None)
+
+# For every audio provided, get the spectrogram and sid
 
 audios = {}
 with open("/ssd_scratch/cvit/yash/vits/convertData.txt", "r+") as dataFile:
@@ -42,24 +48,27 @@ with open("/ssd_scratch/cvit/yash/vits/convertData.txt", "r+") as dataFile:
 i = 0
 l = len(audios)    
 for audioPath, (src_sid, tgt_sid) in audios.items():
-    print(f"Progress: {i}/{l} ({i / l * 100 :.2f}%)") #, end="\r")
+    print(f"Progress: {i}/{l} ({i / l * 100 :.2f}%)", end="\r")
     filename = audioPath.split("/")[-1]
-    audio, sr = utils.load_wav_to_torch(audioPath)
-    audioNorm = audio / 1.33 # 1.33 = Max Wav value
-    audioNorm = audioNorm.unsqueeze(0)
-    spec = spectrogram_torch(
-        audioNorm,
-        hps.data.filter_length,
-        hps.data.sampling_rate,
-        hps.data.hop_length,
-        hps.data.win_length,
-        center=False
-    )
-    
+    #audio, sr = utils.load_wav_to_torch(audioPath)
+    #audioNorm = audio / 1.33 # 1.33 = Max Wav value
+    #audioNorm = audioNorm.unsqueeze(0)
+    #spec = spectrogram_torch(
+    #    audioNorm,
+    #    hps.data.filter_length,
+    #    hps.data.sampling_rate,
+    #    hps.data.hop_length,
+    #    hps.data.win_length,
+    #    center=False
+    #)
+    try:
+        spec = torch.load(audioPath.replace(".wav", ".spec.pt")).unsqueeze(0)
+    except:
+        print(f"Skipping file {filename}", flush=True)
+        continue
     specLen = torch.LongTensor([spec.size(1)])
     sid1 = torch.LongTensor([int(src_sid)])
     sid2 = torch.LongTensor([int(tgt_sid)])
-    print(net_g.enc_q)
     torch.cuda.empty_cache()
     convertedAudio = net_g.voice_conversion(
         spec.cuda(non_blocking=True), 
@@ -67,10 +76,9 @@ for audioPath, (src_sid, tgt_sid) in audios.items():
         sid_src = sid1.cuda(non_blocking=True),
         sid_tgt = sid2.cuda(non_blocking=True),
     )[0][0, 0].data.cpu().float()
-    torch.cuda.empty_cache()
     torchaudio.save(
         f"/ssd_scratch/cvit/yash/vits/converted/{filename}",
-        convertedAudio,
+        convertedAudio.unsqueeze(0),
         sample_rate=16_000,
     )
     i += 1
