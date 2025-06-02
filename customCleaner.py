@@ -39,8 +39,8 @@
 import text
 import os
 if __name__ == "__main__":
-    cleanedFileList = "wtimit_train2.txt.cleaned"
-    fileList = "wtimit_normal_list1.txt_temp"
+    cleanedFileList = "filelists/wt_custom.txt.cleaned"
+    fileList = "filelists/wt_custom.txt"
     lines = []
     with open(fileList, "r+") as readFile:
         lines = readFile.readlines()
