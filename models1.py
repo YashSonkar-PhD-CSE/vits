@@ -458,12 +458,13 @@ class SynthesizerTrn(nn.Module):
       self.emb_g = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
       self.mlp = nn.Linear(192, gin_channels)
       self.emb_g.eval()
+      self.emb_g.requires_grad_(False)
 
-  def forward(self, x, x_lengths, y, y_lengths, sid=None):
+  def forward(self, x, x_lengths, y, y_lengths, wav, wav_lengths, sid=None):
 
     x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
     if self.n_speakers > 0:
-      g = self.emb_g(sid)
+      g = self.emb_g(input_signal = wav.squeeze(1), input_signal_length = wav_lengths)[1]
       g = self.mlp(g).unsqueeze(-1)# [b, h, 1]
 
     else:
@@ -498,14 +499,14 @@ class SynthesizerTrn(nn.Module):
     logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
     z_slice, ids_slice = commons.rand_slice_segments(z, y_lengths, self.segment_size)
-    print(z_slice.shape, z.shape)
     o = self.dec(z_slice, g=g)
     return o, l_length, attn, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
-  def infer(self, x, x_lengths, sid=None, noise_scale=1, length_scale=1, noise_scale_w=1., max_len=None):
+  def infer(self, x, x_lengths, wav, wav_lengths, sid=None, noise_scale=1, length_scale=1, noise_scale_w=1., max_len=None):
     x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
     if self.n_speakers > 0:
-      g = self.emb_g(sid).unsqueeze(-1) # [b, h, 1]
+      g = self.emb_g(input_signal = wav.squeeze(1), input_signal_length = wav_lengths)[1]
+      g = self.mlp(g).unsqueeze(-1) # [b, h, 1]
     else:
       g = None
 
@@ -525,7 +526,6 @@ class SynthesizerTrn(nn.Module):
 
     z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
     z = self.flow(z_p, y_mask, g=None, reverse=True)
-    print(z.shape)
     o = self.dec((z * y_mask)[:,:,:max_len], g=g)
     return o, attn, y_mask, (z, z_p, m_p, logs_p)
 

@@ -135,7 +135,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   wandb.login(key="4abbb21b2d83424beaac33db691b8736ef01b7ed")
   wandb.init(
       project = "Speech Experiments",
-      name = "VITS_MS_WT_Mod_Sp_Embed",
+      name = "VITS_wTIMIT 44 Speakers",
   )
 
   train_loader.batch_sampler.set_epoch(epoch)
